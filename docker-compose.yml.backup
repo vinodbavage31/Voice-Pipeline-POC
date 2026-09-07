@@ -8,7 +8,7 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
       POSTGRES_DB: ${POSTGRES_DB:-voicedb}
     ports:
-      - "55432:5432"
+      - "5432:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
       - ./scripts/init.sql:/docker-entrypoint-initdb.d/init.sql
@@ -21,16 +21,14 @@ services:
   backend:
     build:
       context: ./backend
-    env_file:
-      - .env
     ports:
       - "8000:8000"
     environment:
       - DATABASE_URL=postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@db:5432/${POSTGRES_DB:-voicedb}
-      - ASR_PROVIDER=${ASR_PROVIDER:-sarvam}
-      - TRANSLATION_PROVIDER=${TRANSLATION_PROVIDER:-gemini}
-      - EMBEDDING_PROVIDER=${EMBEDDING_PROVIDER:-bge-m3}
-      - RERANKER_PROVIDER=${RERANKER_PROVIDER:-cross-encoder}
+      - ASR_PROVIDER=${ASR_PROVIDER:-mock}
+      - TRANSLATION_PROVIDER=${TRANSLATION_PROVIDER:-mock}
+      - EMBEDDING_PROVIDER=${EMBEDDING_PROVIDER:-mock}
+      - RERANKER_PROVIDER=${RERANKER_PROVIDER:-mock}
     depends_on:
       db:
         condition: service_healthy

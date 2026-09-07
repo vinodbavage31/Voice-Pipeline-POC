@@ -107,18 +107,18 @@ Do not commit `.env`. It can contain provider credentials.
 
 ## 5. Local Provider Modes
 
-Docker Compose defaults the backend to mock providers unless values are explicitly supplied through the shell or `.env`:
+The project is configured to use the real providers by default when you start the backend from the repository `.env` file:
 
 ```text
-ASR_PROVIDER=mock
-TRANSLATION_PROVIDER=mock
-EMBEDDING_PROVIDER=mock
-RERANKER_PROVIDER=mock
+ASR_PROVIDER=sarvam
+TRANSLATION_PROVIDER=gemini
+EMBEDDING_PROVIDER=bge-m3
+RERANKER_PROVIDER=cross-encoder
 ```
 
-This is the recommended first run. It avoids external API calls, API keys, and large embedding/reranker model downloads.
+Set your real API keys in `.env` before starting the backend. The mock providers remain available for tests and local offline development, but they are not the default runtime configuration.
 
-To use real providers, set these values in `.env` before starting the backend:
+To verify the real provider setup, ensure the following values are present in `.env` before starting the backend:
 
 ```text
 ASR_PROVIDER=sarvam

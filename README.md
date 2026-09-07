@@ -25,7 +25,7 @@ This is a proof-of-concept for a Voice RAG (Retrieval-Augmented Generation) appl
    ```cmd
    copy .env.example .env
    ```
-5. Open `.env` and add any required environment values (or leave as defaults for mock providers).
+5. Open `.env` and add any required API keys and provider values. The default runtime configuration uses the real providers configured in the template.
 6. Build and start the services:
    ```cmd
    docker compose up -d --build
@@ -49,7 +49,7 @@ This is a proof-of-concept for a Voice RAG (Retrieval-Augmented Generation) appl
    ```bash
    cp .env.example .env
    ```
-6. Open `.env` and add any required environment values (or leave as defaults for mock providers).
+6. Open `.env` and add any required API keys and provider values. The default runtime configuration uses the real providers configured in the template.
 7. Build and start the services:
    ```bash
    docker compose up -d --build

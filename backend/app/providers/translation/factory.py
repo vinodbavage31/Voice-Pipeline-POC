@@ -4,9 +4,9 @@ from app.providers.translation.base import TranslationProvider
 def get_translation_provider() -> TranslationProvider:
     provider_name = settings.TRANSLATION_PROVIDER.lower()
     
-    # We default GEMINI model to gemini-pro if not specified elsewhere. 
+    # We default GEMINI model to gemini-3.6-flash if not specified elsewhere. 
     # Usually you'd configure this in app/config.py, let's just use a hardcoded fallback.
-    gemini_model_name = "gemini-pro"
+    gemini_model_name = "gemini-3.6-flash"
     
     if provider_name == "gemini":
         from app.providers.translation.gemini import GeminiTranslationProvider

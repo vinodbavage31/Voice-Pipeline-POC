@@ -42,4 +42,4 @@ def test_factory_returns_gemini():
                 with patch("app.providers.translation.gemini.genai.GenerativeModel"):
                     provider = get_translation_provider()
                     assert isinstance(provider, GeminiTranslationProvider)
-                    assert provider.model_name == "gemini-pro"
+                    assert provider.model_name == "gemini-3.6-flash"
