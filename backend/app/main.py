@@ -17,9 +17,10 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-from app.api.v1 import audio, search
+from app.api.v1 import audio, search, answer
 app.include_router(audio.router)
 app.include_router(search.router)
+app.include_router(answer.router)
 
 @app.get("/health")
 def health_check(db: Session = Depends(get_db)):

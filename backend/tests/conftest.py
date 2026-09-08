@@ -7,9 +7,17 @@ from app.db.database import Base, get_db
 import os
 import shutil
 
-# In-memory SQLite for testing
-SQLALCHEMY_DATABASE_URL = "sqlite:///./test.db"
-engine = create_engine(SQLALCHEMY_DATABASE_URL, connect_args={"check_same_thread": False})
+# Use in-memory SQLite with a StaticPool so the same connection is reused across
+# sessions in the test process. This avoids writing to a filesystem-backed DB
+# which can be readonly inside some container setups.
+from sqlalchemy.pool import StaticPool
+
+SQLALCHEMY_DATABASE_URL = "sqlite:///:memory:"
+engine = create_engine(
+    SQLALCHEMY_DATABASE_URL,
+    connect_args={"check_same_thread": False},
+    poolclass=StaticPool,
+)
 TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 @pytest.fixture(scope="module")
@@ -21,8 +29,6 @@ def db_session():
     db.close()
     # Teardown DB
     Base.metadata.drop_all(bind=engine)
-    if os.path.exists("./test.db"):
-        os.remove("./test.db")
 
 @pytest.fixture(scope="module")
 def client(db_session):
