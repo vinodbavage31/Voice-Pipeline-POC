@@ -1,7 +1,7 @@
 import { FormEvent, useEffect, useMemo, useState } from 'react'
 import './styles.css'
 
-type View = 'upload' | 'processing' | 'result' | 'search'
+type View = 'upload' | 'processing' | 'result' | 'search' | 'answer'
 type Stage = 'Audio preprocessing' | 'ASR' | 'Translation' | 'PII redaction' | 'Chunking' | 'Embedding' | 'Indexing'
 type Audio = { id: number; filename: string; duration?: number; language?: string; region?: string; speaker_id?: string; processing_status: string; processing_stage?: string; processing_error?: string }
 type Transcript = { id: number; transcript_type: string; text: string; language?: string; provider?: string; model?: string; confidence?: number }
@@ -9,6 +9,7 @@ type Chunk = { id: number; text: string; chunk_index: number; token_count: numbe
 type PipelineResult = { audio: Audio; transcripts: Transcript[]; chunks: Chunk[] }
 type SearchItem = { chunk_id: number; content: string; score: number; rank: number; metadata: Record<string, unknown> }
 type SearchResponse = { vector_results: SearchItem[]; keyword_results: SearchItem[]; rrf_results: SearchItem[]; reranked_results: SearchItem[] }
+type Answer = { answer: string; citations: { audio_id?: number; chunk_id?: number; content?: string; speaker_id?: string; region?: string; start_time?: number; end_time?: number; score?: number; rank?: number }[] }
 
 const stages: Stage[] = ['Audio preprocessing', 'ASR', 'Translation', 'PII redaction', 'Chunking', 'Embedding', 'Indexing']
 
@@ -26,6 +27,14 @@ function App() {
   const [topK, setTopK] = useState(5)
   const [search, setSearch] = useState<SearchResponse | null>(null)
   const [searching, setSearching] = useState(false)
+  // Answer view state
+  const [answerQuestion, setAnswerQuestion] = useState('')
+  const [answerRegion, setAnswerRegion] = useState('')
+  const [answerTopK, setAnswerTopK] = useState(5)
+  const [answer, setAnswer] = useState<string | null>(null)
+  const [answerCitations, setAnswerCitations] = useState<Answer['citations']>([])
+  const [answerLoading, setAnswerLoading] = useState(false)
+  const [answerError, setAnswerError] = useState('')
 
   useEffect(() => {
     if (view !== 'processing') return
@@ -76,6 +85,24 @@ function App() {
     } finally { setSearching(false) }
   }
 
+  async function runAnswer(event: FormEvent) {
+    event.preventDefault()
+    if (!answerQuestion.trim()) return
+    setAnswerLoading(true)
+    setAnswerError('')
+    setAnswer(null)
+    setAnswerCitations([])
+    try {
+      const response = await fetch('/api/v1/answer', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ query: answerQuestion, region: answerRegion || null, top_k: answerTopK }) })
+      if (!response.ok) throw new Error((await response.json()).detail ?? 'Answer generation failed')
+      const data: { answer: string; citations: Answer['citations'] } = await response.json()
+      setAnswer(data.answer)
+      setAnswerCitations(data.citations)
+    } catch (caught) {
+      setAnswerError(caught instanceof Error ? caught.message : 'Answer generation failed')
+    } finally { setAnswerLoading(false) }
+  }
+
   return <main className="shell">
     <header className="topbar">
       <button className="brand" onClick={() => setView('upload')}><span className="brand-mark">V</span><span>Voice / RAG</span></button>
@@ -84,6 +111,7 @@ function App() {
         <button className={view === 'processing' ? 'active' : ''} disabled={!audio && view !== 'processing'} onClick={() => setView('processing')}>Processing</button>
         <button className={view === 'result' ? 'active' : ''} disabled={!result} onClick={() => setView('result')}>Transcript result</button>
         <button className={view === 'search' ? 'active' : ''} onClick={() => setView('search')}>Search</button>
+        <button className={view === 'answer' ? 'active' : ''} onClick={() => setView('answer')}>Ask question</button>
       </nav>
       <span className="system-status"><i /> Prototype online</span>
     </header>
@@ -94,6 +122,7 @@ function App() {
       {view === 'processing' && <ProcessingPage audio={audio} activeStage={activeStage} />}
       {view === 'result' && <ResultPage result={result} transcriptMap={transcriptMap} />}
       {view === 'search' && <SearchPage query={query} setQuery={setQuery} region={searchRegion} setRegion={setSearchRegion} topK={topK} setTopK={setTopK} onSubmit={runSearch} search={search} searching={searching} />}
+      {view === 'answer' && <AnswerPage question={answerQuestion} setQuestion={setAnswerQuestion} region={answerRegion} setRegion={setAnswerRegion} topK={answerTopK} setTopK={setAnswerTopK} onSubmit={runAnswer} answer={answer} citations={answerCitations} loading={answerLoading} error={answerError} />}
     </section>
   </main>
 }
@@ -118,6 +147,87 @@ function formatTime(value?: number) { return value == null || !Number.isFinite(v
 function SearchPage(props: { query: string; setQuery: (value: string) => void; region: string; setRegion: (value: string) => void; topK: number; setTopK: (value: number) => void; onSubmit: (event: FormEvent) => void; search: SearchResponse | null; searching: boolean }) {
   const groups: Array<[string, SearchItem[]]> = props.search ? [['Final reranked', props.search.reranked_results], ['RRF candidates', props.search.rrf_results], ['Vector results', props.search.vector_results], ['Keyword results', props.search.keyword_results]] : []
   return <div className="search-page"><div className="section-title"><p className="kicker">04 / SEARCH</p><h1>Ask the record.</h1><p className="lede">Compare semantic, keyword, fused, and reranked evidence without losing the trail.</p></div><form className="search-bar" onSubmit={props.onSubmit}><input value={props.query} onChange={(event) => props.setQuery(event.target.value)} placeholder="Ask a question about your recordings..." /><select value={props.region} onChange={(event) => props.setRegion(event.target.value)}><option value="">All regions</option><option>Karnataka</option><option>Tamil Nadu</option><option>Kerala</option><option>Andhra Pradesh</option></select><label className="top-k">Top <input type="number" min="1" max="20" value={props.topK} onChange={(event) => props.setTopK(Number(event.target.value))} /></label><button className="primary" type="submit">{props.searching ? 'Searching...' : 'Search'} <span>→</span></button></form>{groups.length ? <div className="search-groups">{groups.map(([title, items]) => <section className="search-group" key={title}><div className="section-label"><span>{title}</span><small>{items.length} results</small></div>{items.map((item) => <article className="search-result" key={`${title}-${item.chunk_id}`}><div className="result-rank">#{item.rank}</div><div className="result-body"><p>{item.content}</p><div className="result-meta"><span>{String(item.metadata.source_type || 'voice')}</span><span>{String(item.metadata.region || 'All regions')}</span><span>{formatTime(Number(item.metadata.start_time))} — {formatTime(Number(item.metadata.end_time))}</span><span>Audio #{String(item.metadata.audio_id || '—')}</span></div></div><strong className="score">{item.score.toFixed(4)}<small>score</small></strong></article>)}</section>)}</div> : <EmptyState title="Search across your indexed voice records" />}</div>
+}
+
+function AnswerPage(props: {
+  question: string;
+  setQuestion: (value: string) => void;
+  region: string;
+  setRegion: (value: string) => void;
+  topK: number;
+  setTopK: (value: number) => void;
+  onSubmit: (event: FormEvent) => void;
+  answer: string | null;
+  citations: Answer['citations'];
+  loading: boolean;
+  error: string
+}) {
+  return (
+    <div className="answer-page">
+      <div className="section-title">
+        <p className="kicker">05 / ANSWER</p>
+        <h1>Grounded answers from your recordings.</h1>
+        <p className="lede">Ask a question and get an answer with citations to the exact source chunks.</p>
+      </div>
+      <form className="answer-bar" onSubmit={props.onSubmit}>
+        <input
+          value={props.question}
+          onChange={(event) => props.setQuestion(event.target.value)}
+          placeholder="Ask a question about your recordings..."
+        />
+        <select
+          value={props.region}
+          onChange={(event) => props.setRegion(event.target.value)}
+        >
+          <option value="">All regions</option>
+          <option>Karnataka</option>
+          <option>Tamil Nadu</option>
+          <option>Kerala</option>
+          <option>Andhra Pradesh</option>
+        </select>
+        <label className="top-k">
+          Top <input
+            type="number"
+            min="1"
+            max="20"
+            value={props.topK}
+            onChange={(event) => props.setTopK(Number(event.target.value))}
+          />
+        </label>
+        <button className="primary" type="submit">
+          {props.loading ? 'Generating...' : 'Get answer'} <span>→</span>
+        </button>
+      </form>
+      {props.error && <div className="alert">{props.error}</div>}
+      {props.loading && <div className="answer-loading">Generating answer with citations...</div>}
+      {props.answer && (
+        <div className="answer-result">
+          <div className="answer-text">
+            <p>{props.answer}</p>
+          </div>
+          {props.citations.length > 0 && (
+            <div className="answer-citations">
+              <h3>Citations</h3>
+              {props.citations.map((cite, index) => (
+                <div className="citation" key={index}>
+                  <div className="citation-header">
+                    [Chunk {cite.chunk_id}] {cite.region?.toUpperCase() ?? 'ALL REGIONS'} • {formatTime(cite.start_time)} — {formatTime(cite.end_time)}
+                  </div>
+                  <p>{cite.content}</p>
+                  <div className="citation-meta">
+                    <span>Audio #{cite.audio_id}</span>
+                    {cite.speaker_id && <span> · Speaker {cite.speaker_id}</span>}
+                    {cite.score != null && <span> · Score {cite.score.toFixed(3)}</span>}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+      {!props.answer && !props.loading && !props.error && <EmptyState title="Ask a question to get a grounded answer" />}
+    </div>
+  );
 }
 
 function EmptyState({ title }: { title: string }) { return <div className="empty-state"><span>⌕</span><h2>{title}</h2></div> }
